@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "K-Autokey",
+  "outputfilename": "K-Autokey",
+  "frontend:dir": "frontend",
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+  "author": {
+    "name": "kyrist",
+    "email": ""
+  },
+  "info": {
+    "companyName": "K-Autokey",
+    "productName": "K-Autokey",
+    "productVersion": "0.2.0"
+  }
+}

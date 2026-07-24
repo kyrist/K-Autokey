@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+bin/
+tools/
+.idea/
+.vscode/
+*.log
+node_modules/
+frontend/wailsjs/
+*.exe
+!scripts/

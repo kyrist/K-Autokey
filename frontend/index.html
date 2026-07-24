@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>K-Autokey</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand-block">
+        <p class="brand">K-Autokey</p>
+        <p class="tagline">开启后，按住哪个键就连发哪个键</p>
+      </div>
+      <div id="status" class="status">状态：启动中…</div>
+    </header>
+
+    <section class="panel keyboard-panel">
+      <div class="panel-head">
+        <div class="panel-head-main">
+          <h2>绑定按键</h2>
+          <span id="selected-keys" class="muted">已选：—</span>
+        </div>
+        <div class="bind-info">
+          <span id="process-info" class="process-info" title="">进程：未绑定</span>
+          <button type="button" id="btn-open-process" class="btn btn-sm">设置进程</button>
+        </div>
+      </div>
+      <div id="keyboard" class="keyboard" aria-label="键盘布局"></div>
+    </section>
+
+    <section class="bottom-bar">
+      <div class="field field-interval">
+        <label for="interval-input">间隔 (ms)</label>
+        <input id="interval-input" type="number" min="1" max="10000" value="50" />
+      </div>
+      <div class="field field-hotkey">
+        <label for="enable-hotkey">开启热键</label>
+        <button type="button" id="enable-hotkey" class="hotkey-btn" title="点击后按下组合键">F6</button>
+      </div>
+      <div class="field field-hotkey">
+        <label for="emergency-hotkey">紧急停止</label>
+        <button type="button" id="emergency-hotkey" class="hotkey-btn" title="点击后按下组合键">F8</button>
+      </div>
+      <div class="actions">
+        <button type="button" id="btn-start" class="btn primary">开启</button>
+        <button type="button" id="btn-stop" class="btn">关闭</button>
+        <button type="button" id="btn-save" class="btn accent">保存</button>
+        <button type="button" id="btn-tray" class="btn" title="隐藏到系统托盘">后台</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="process-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="process-modal-title">
+      <div class="modal-head">
+        <h3 id="process-modal-title">绑定进程</h3>
+        <button type="button" class="modal-close" data-close-modal aria-label="关闭">×</button>
+      </div>
+      <p class="modal-desc muted">选择目标进程：其窗口位于前台时自动开启连发，切走则停止。</p>
+      <div class="modal-toolbar">
+        <button type="button" id="btn-refresh-process" class="btn btn-sm">刷新列表</button>
+        <button type="button" id="btn-clear-process" class="btn btn-sm">清除绑定</button>
+      </div>
+      <div id="process-list" class="process-list"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
