@@ -23,6 +23,30 @@ function Format-Size([long]$bytes) {
     return ("{0:N2} MB" -f ($bytes / 1MB))
 }
 
+function Find-Tool([string]$name) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    $gobin = $env:GOPATH
+    if (-not $gobin) { $gobin = Join-Path $env:USERPROFILE "go" }
+    $candidate = Join-Path $gobin "bin\$name.exe"
+    if (Test-Path $candidate) { return $candidate }
+    return $null
+}
+
+function Ensure-RsrcSyso {
+    # Regenerate rsrc.syso (icon + manifest) if rsrc.exe is available,
+    # so the exe embeds the logo and admin manifest. Falls back to committed syso.
+    $rsrc = Find-Tool "rsrc"
+    if (-not $rsrc) { return }
+    $ico = Join-Path $Root "app.ico"
+    $man = Join-Path $Root "embedded\app.manifest"
+    if (-not (Test-Path $ico) -or -not (Test-Path $man)) { return }
+    & $rsrc -manifest $man -ico $ico -o (Join-Path $Root "rsrc.syso")
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "==> rsrc: regenerated rsrc.syso (icon + manifest)"
+    }
+}
+
 function Find-UPX {
     $cmd = Get-Command upx -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
@@ -34,7 +58,10 @@ function Find-UPX {
 function Ensure-UPX {
     $existing = Find-UPX
     if ($existing) { return $existing }
-    if (-not $FetchUPX) { return $null }
+    if (-not $FetchUPX) {
+        # Auto-download UPX if missing so compression is on by default
+        $FetchUPX = $true
+    }
 
     $tools = Join-Path $Root "tools\upx"
     New-Item -ItemType Directory -Force -Path $tools | Out-Null
@@ -47,6 +74,8 @@ function Ensure-UPX {
     Copy-Item $found.FullName (Join-Path $tools "upx.exe") -Force
     return (Join-Path $tools "upx.exe")
 }
+
+Ensure-RsrcSyso
 
 Write-Host "==> go build -tags production,desktop -trimpath (GUI, no console)"
 # Use -ldflags= form so PowerShell does not strip -H=windowsgui
