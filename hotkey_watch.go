@@ -13,7 +13,6 @@ type HotkeyBindings struct {
 
 // BurstControl 热键监视器对连发引擎的最小依赖面。
 type BurstControl interface {
-	IsInjecting() bool
 	EmergencyStop()
 	ToggleEnabled()
 }
@@ -124,9 +123,6 @@ func (h *HotkeyWatcher) loop(stopCh <-chan struct{}) {
 }
 
 func (h *HotkeyWatcher) tick() {
-	if h.burst.IsInjecting() {
-		return
-	}
 	h.mu.Lock()
 	listening := h.listening
 	h.mu.Unlock()

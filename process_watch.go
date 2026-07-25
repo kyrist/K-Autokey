@@ -8,7 +8,6 @@ import (
 // FocusBurstControl 进程焦点监视器对连发的依赖。
 // armed = 热键/按钮总开关；enabled = 当前是否真正在连发。
 type FocusBurstControl interface {
-	IsInjecting() bool
 	IsEnabled() bool
 	IsArmed() bool
 	SetEnabled(on bool)
@@ -98,9 +97,6 @@ func (p *ProcessFocusWatcher) tick() {
 	name := p.bound
 	p.mu.Unlock()
 	if name == "" {
-		return
-	}
-	if p.burst.IsInjecting() {
 		return
 	}
 

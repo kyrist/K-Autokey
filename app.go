@@ -32,8 +32,6 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	debugLogInit()
 	debugLog("startup begin")
-	enableHighResolutionTimer()
-	ensurePhysWake()
 	// 连发核心由 AHK 子进程实现（绕过 DNF 对 Go 进程 LL 钩子的拦截）。
 	a.engine = NewEngine(a.onBurstStateChanged)
 	a.hotkeys = NewHotkeyWatcher(a) // 热键走 App，与进程绑定统一受总开关控制
@@ -74,11 +72,7 @@ func (a *App) onBurstStateChanged(enabled bool) {
 	}
 }
 
-// IsInjecting / ToggleEnabled / EmergencyStop：供 HotkeyWatcher 调用（BurstControl）。
-func (a *App) IsInjecting() bool {
-	return a.engine != nil && a.engine.IsInjecting()
-}
-
+// ToggleEnabled / EmergencyStop：供 HotkeyWatcher 调用（BurstControl）。
 func (a *App) ToggleEnabled() {
 	if a.engine == nil {
 		debugLog("ToggleEnabled: engine==nil")
@@ -154,7 +148,6 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.tray != nil {
 		a.tray.Stop()
 	}
-	disableHighResolutionTimer()
 }
 
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
@@ -295,13 +288,11 @@ func (a *App) Stop() ActionResult {
 
 // applyConfig 把一份配置拆开交给各独立子系统，避免它们互相读取对方状态。
 func (a *App) applyConfig(cfg AppConfig) {
-	SetSuppressPhysical(cfg.SuppressPhysical)
 	if a.engine != nil {
 		a.engine.Configure(RepeatSettings{
 			KeyVKs:     LabelsToVKs(cfg.KeyLabels),
 			IntervalMs: cfg.IntervalMs,
 		})
-		a.engine.SyncSuppressMode()
 	}
 	if a.hotkeys != nil {
 		a.hotkeys.Configure(HotkeyBindings{
