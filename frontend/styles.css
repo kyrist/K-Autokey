@@ -421,7 +421,7 @@ input[type="number"] {
 .bottom-bar {
   flex-shrink: 0;
   display: grid;
-  grid-template-columns: 88px 148px 148px auto;
+  grid-template-columns: 88px minmax(168px, 210px) 148px 148px auto;
   gap: 10px;
   align-items: end;
   justify-content: start;
@@ -441,6 +441,48 @@ input[type="number"] {
 .field-interval {
   width: 88px;
   min-width: 88px;
+}
+
+.field-backend {
+  min-width: 0;
+}
+
+.field-backend select {
+  width: 100%;
+}
+
+.backend-hint {
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.backend-hint.ok {
+  color: var(--accent);
+}
+
+.backend-hint.warn {
+  color: #a15c18;
+}
+
+.check-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.check-inline input {
+  margin: 0;
+}
+
+.check-inline.is-disabled {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .field-hotkey {

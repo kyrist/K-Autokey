@@ -305,24 +305,24 @@ func keyTokenToVK(name string) uint16 {
 func modDown(req ModifierReq, leftVK, rightVK uint16) bool {
 	switch req {
 	case ModNone:
-		return !asyncKeyDown(leftVK) && !asyncKeyDown(rightVK)
+		return !hotkeyKeyDown(leftVK) && !hotkeyKeyDown(rightVK)
 	case ModAny:
-		return asyncKeyDown(leftVK) || asyncKeyDown(rightVK)
+		return hotkeyKeyDown(leftVK) || hotkeyKeyDown(rightVK)
 	case ModLeft:
-		return asyncKeyDown(leftVK)
+		return hotkeyKeyDown(leftVK)
 	case ModRight:
-		return asyncKeyDown(rightVK)
+		return hotkeyKeyDown(rightVK)
 	default:
 		return false
 	}
 }
 
-// IsDown 精确匹配：所需修饰键按下、未声明的修饰键未按下、主键按下。
+// IsDown 精确匹配热键，读 GetAsyncKeyState（热键不吞，状态可靠）。
 func (h ParsedHotkey) IsDown() bool {
 	if !h.Valid() {
 		return false
 	}
-	if !asyncKeyDown(h.KeyVK) {
+	if !hotkeyKeyDown(h.KeyVK) {
 		return false
 	}
 	if !modDown(h.Ctrl, 0xA2, 0xA3) {

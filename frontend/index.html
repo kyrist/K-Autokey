@@ -33,7 +33,14 @@
     <section class="bottom-bar">
       <div class="field field-interval">
         <label for="interval-input">间隔 (ms)</label>
-        <input id="interval-input" type="number" min="1" max="10000" value="50" />
+        <input id="interval-input" type="number" min="1" max="10000" value="1" />
+      </div>
+      <div class="field field-backend">
+        <label class="check-inline" id="suppress-physical-wrap" title="勾选=AHK $ 吞掉物理键避免叠加；不勾选=AHK ~ 透传">
+          <input type="checkbox" id="suppress-physical" />
+          吞物理键 ($)
+        </label>
+        <span id="input-backend-hint" class="backend-hint muted">检测中…</span>
       </div>
       <div class="field field-hotkey">
         <label for="enable-hotkey">开启热键</label>

@@ -14,20 +14,22 @@ import (
 
 // AppConfig 本地持久化配置（字段与前端 UIConfig / config.json 对齐）。
 type AppConfig struct {
-	KeyLabels       []string `json:"key_labels"`
-	IntervalMs      int      `json:"interval_ms"`
-	EnableHotkey    string   `json:"enable_hotkey"`
-	EmergencyHotkey string   `json:"emergency_hotkey"`
-	BoundProcess    string   `json:"bound_process"`
+	KeyLabels        []string `json:"key_labels"`
+	IntervalMs       int      `json:"interval_ms"`
+	EnableHotkey     string   `json:"enable_hotkey"`
+	EmergencyHotkey  string   `json:"emergency_hotkey"`
+	BoundProcess     string   `json:"bound_process"`
+	SuppressPhysical bool     `json:"suppress_physical"` // true=AHK $ 吞键；false=AHK ~ 透传
 }
 
 func DefaultConfig() AppConfig {
 	return AppConfig{
-		KeyLabels:       []string{"Space"},
-		IntervalMs:      50,
-		EnableHotkey:    "f6",
-		EmergencyHotkey: "f8",
-		BoundProcess:    "",
+		KeyLabels:        []string{"Space"},
+		IntervalMs:       1,
+		EnableHotkey:     "f6",
+		EmergencyHotkey:  "f8",
+		BoundProcess:     "",
+		SuppressPhysical: true,
 	}
 }
 
@@ -73,11 +75,12 @@ func SaveConfig(cfg AppConfig) error {
 
 func (c AppConfig) ToMap() map[string]interface{} {
 	return map[string]interface{}{
-		"key_labels":       c.KeyLabels,
-		"interval_ms":      c.IntervalMs,
-		"enable_hotkey":    c.EnableHotkey,
-		"emergency_hotkey": c.EmergencyHotkey,
-		"bound_process":    c.BoundProcess,
+		"key_labels":        c.KeyLabels,
+		"interval_ms":       c.IntervalMs,
+		"enable_hotkey":     c.EnableHotkey,
+		"emergency_hotkey":  c.EmergencyHotkey,
+		"bound_process":      c.BoundProcess,
+		"suppress_physical":  c.SuppressPhysical,
 	}
 }
 
@@ -103,6 +106,7 @@ func NormalizeUIConfig(cfg UIConfig) AppConfig {
 		}
 	}
 	out.BoundProcess = normalizeProcessName(cfg.BoundProcess)
+	out.SuppressPhysical = cfg.SuppressPhysical
 	return out
 }
 
@@ -146,6 +150,9 @@ func configFromMap(raw map[string]interface{}) AppConfig {
 	}
 	if v, ok := raw["bound_process"].(string); ok {
 		cfg.BoundProcess = normalizeProcessName(v)
+	}
+	if v, ok := raw["suppress_physical"].(bool); ok {
+		cfg.SuppressPhysical = v
 	}
 	return cfg
 }

@@ -139,10 +139,11 @@ const MOD_CODES = new Set([
 
 const state = {
   keyLabels: ["Space"],
-  intervalMs: 50,
+  intervalMs: 1,
   enableHotkey: "f6",
   emergencyHotkey: "f8",
   boundProcess: "",
+  suppressPhysical: true,
   keyChoices: [],
   processes: [],
   enabled: false,
@@ -460,10 +461,11 @@ function renderKeys() {
 function collectConfig() {
   return {
     key_labels: state.keyLabels.length ? state.keyLabels : ["Space"],
-    interval_ms: Number(state.intervalMs) || 50,
+    interval_ms: Number(state.intervalMs) || 1,
     enable_hotkey: state.enableHotkey || "f6",
     emergency_hotkey: state.emergencyHotkey || "f8",
     bound_process: state.boundProcess || "",
+    suppress_physical: !!state.suppressPhysical,
   };
 }
 
@@ -509,7 +511,7 @@ function normalizeKeyLabels(labels) {
 
 function idleStatus() {
   if (state.boundProcess) {
-    return `已绑定 ${state.boundProcess} — 切到该窗口自动连发`;
+    return `已关闭 — 按热键或「开启」后，${state.boundProcess} 前台才连发`;
   }
   return `未开启 — 点「开启」或按 ${formatHotkeyDisplay(state.enableHotkey)}`;
 }
@@ -606,17 +608,45 @@ function closeProcessModal() {
   $("process-modal").hidden = true;
 }
 
+function applyInputStatus(status) {
+  const hint = $("input-backend-hint");
+  if (!hint) return;
+  if (!status) {
+    hint.textContent = "";
+    hint.classList.remove("ok", "warn");
+    return;
+  }
+  hint.textContent = status.message || "";
+  hint.title = status.message || "";
+  hint.classList.toggle("ok", !!status.active);
+  hint.classList.remove("warn");
+
+  const suppressEl = $("suppress-physical");
+  const wrap = $("suppress-physical-wrap");
+  if (suppressEl) {
+    suppressEl.disabled = false;
+  }
+  if (wrap) {
+    wrap.title = "勾选=AHK $ 吞掉物理键避免叠加；不勾选=AHK ~ 透传";
+    wrap.classList.remove("is-disabled");
+  }
+}
+
 function applyBootstrap(data) {
   const cfg = data.config || {};
   state.keyChoices = data.key_choices || [];
   state.keyLabels = normalizeKeyLabels(cfg.key_labels);
-  state.intervalMs = cfg.interval_ms || 50;
+  state.intervalMs = cfg.interval_ms || 1;
   state.enableHotkey = cfg.enable_hotkey || cfg.hold_hotkey || "f6";
   state.emergencyHotkey = cfg.emergency_hotkey || "f8";
   state.boundProcess = (cfg.bound_process || "").toLowerCase();
+  state.suppressPhysical = cfg.suppress_physical !== false;
   state.enabled = !!data.enabled;
 
   $("interval-input").value = String(state.intervalMs);
+  const suppressEl = $("suppress-physical");
+  if (suppressEl) suppressEl.checked = state.suppressPhysical;
+  applyInputStatus(data.input_status);
   state.processes = data.processes || [];
   syncProcessInfo();
   syncHotkeyButtons();
@@ -701,6 +731,19 @@ function bindEvents() {
       syncInterval(e.target.value);
     }
   });
+
+  const suppressEl = $("suppress-physical");
+  if (suppressEl) {
+    suppressEl.addEventListener("change", async (e) => {
+      state.suppressPhysical = !!e.target.checked;
+      await pushConfig();
+      try {
+        const api = await waitApi();
+        if (api.GetInputStatus) applyInputStatus(await api.GetInputStatus());
+      } catch (_) {}
+    });
+  }
+
   $("enable-hotkey").addEventListener("click", () => setCapturing("enable"));
   $("emergency-hotkey").addEventListener("click", () => setCapturing("emergency"));
   window.addEventListener("keydown", onCaptureKeyDown, true);
@@ -797,6 +840,9 @@ async function boot() {
     // 先订阅事件，再推配置，避免自动启停事件丢失
     if (window.runtime && window.runtime.EventsOn) {
       window.runtime.EventsOn("running", onEnabledChanged);
+      window.runtime.EventsOn("status", (msg) => {
+        if (typeof msg === "string" && msg) setStatus(msg, state.enabled);
+      });
     }
     const data = await api.GetBootstrap();
     applyBootstrap(data);

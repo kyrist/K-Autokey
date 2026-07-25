@@ -30,8 +30,13 @@ func NewApp() *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	debugLogInit()
+	debugLog("startup begin")
+	enableHighResolutionTimer()
+	ensurePhysWake()
+	// 连发核心由 AHK 子进程实现（绕过 DNF 对 Go 进程 LL 钩子的拦截）。
 	a.engine = NewEngine(a.onBurstStateChanged)
-	a.hotkeys = NewHotkeyWatcher(a.engine)
+	a.hotkeys = NewHotkeyWatcher(a) // 热键走 App，与进程绑定统一受总开关控制
 	a.procWatch = NewProcessFocusWatcher(a.engine)
 
 	a.applyConfig(a.config)
@@ -50,21 +55,66 @@ func (a *App) startup(ctx context.Context) {
 			runtime.Quit(a.ctx)
 		},
 		IsEnabled: func() bool {
-			return a.engine != nil && a.engine.IsEnabled()
+			return a.engine != nil && a.engine.IsArmed()
 		},
 	})
 	a.tray.Start()
 	a.tray.UpdateEnabled(a.engine.IsEnabled())
+	debugLog("startup done")
 }
 
 func (a *App) onBurstStateChanged(enabled bool) {
 	// 引擎状态变更的唯一出口：通知前端 + 托盘，避免子系统互相调用 UI
 	if a.ctx != nil {
 		runtime.EventsEmit(a.ctx, "running", enabled)
+		runtime.EventsEmit(a.ctx, "status", a.statusText(enabled))
 	}
 	if a.tray != nil {
-		a.tray.UpdateEnabled(enabled)
+		a.tray.UpdateEnabled(a.engine != nil && a.engine.IsArmed())
 	}
+}
+
+// IsInjecting / ToggleEnabled / EmergencyStop：供 HotkeyWatcher 调用（BurstControl）。
+func (a *App) IsInjecting() bool {
+	return a.engine != nil && a.engine.IsInjecting()
+}
+
+func (a *App) ToggleEnabled() {
+	if a.engine == nil {
+		debugLog("ToggleEnabled: engine==nil")
+		return
+	}
+	if a.engine.IsArmed() {
+		debugLog("ToggleEnabled: IsArmed=true -> Stop")
+		_ = a.Stop()
+		return
+	}
+	debugLog("ToggleEnabled: IsArmed=false -> Start")
+	_ = a.Start()
+}
+
+func (a *App) EmergencyStop() {
+	_ = a.Stop()
+}
+
+// syncBurstWithFocus：总开关打开后，按是否绑定进程决定 enabled。
+func (a *App) syncBurstWithFocus() {
+	if a.engine == nil {
+		return
+	}
+	if !a.engine.IsArmed() {
+		debugLog("syncBurstWithFocus: not armed -> SetEnabled(false)")
+		a.engine.SetEnabled(false)
+		return
+	}
+	if a.procWatch != nil && a.procWatch.Bound() != "" {
+		fg := a.procWatch.IsTargetForeground()
+		debugLog("syncBurstWithFocus: bound=%q fg=%v -> SetEnabled(%v)", a.procWatch.Bound(), fg, fg)
+		a.engine.SetEnabled(fg)
+		return
+	}
+	debugLog("syncBurstWithFocus: no binding -> SetEnabled(true)")
+	a.engine.SetEnabled(true)
 }
 
 func (a *App) showMainWindow() {
@@ -104,6 +154,7 @@ func (a *App) shutdown(ctx context.Context) {
 	if a.tray != nil {
 		a.tray.Stop()
 	}
+	disableHighResolutionTimer()
 }
 
 func (a *App) beforeClose(ctx context.Context) (prevent bool) {
@@ -124,11 +175,12 @@ func (a *App) HideToTray() ActionResult {
 
 // Bootstrap 返回前端初始化数据。
 type Bootstrap struct {
-	KeyChoices []string               `json:"key_choices"`
-	Config     map[string]interface{} `json:"config"`
-	Status     string                 `json:"status"`
-	Enabled    bool                   `json:"enabled"`
-	Processes  []ProcessInfo          `json:"processes"`
+	KeyChoices  []string               `json:"key_choices"`
+	Config      map[string]interface{} `json:"config"`
+	Status      string                 `json:"status"`
+	Enabled     bool                   `json:"enabled"`
+	Processes   []ProcessInfo          `json:"processes"`
+	InputStatus InputStatus            `json:"input_status"`
 }
 
 // ActionResult 供前端判断操作结果。
@@ -140,22 +192,28 @@ type ActionResult struct {
 
 // UIConfig 对应前端 collectConfig() 字段。
 type UIConfig struct {
-	KeyLabels       []string `json:"key_labels"`
-	IntervalMs      int      `json:"interval_ms"`
-	EnableHotkey    string   `json:"enable_hotkey"`
-	EmergencyHotkey string   `json:"emergency_hotkey"`
-	BoundProcess    string   `json:"bound_process"`
+	KeyLabels        []string `json:"key_labels"`
+	IntervalMs       int      `json:"interval_ms"`
+	EnableHotkey     string   `json:"enable_hotkey"`
+	EmergencyHotkey  string   `json:"emergency_hotkey"`
+	BoundProcess     string   `json:"bound_process"`
+	SuppressPhysical bool     `json:"suppress_physical"`
 }
 
 func (a *App) GetBootstrap() Bootstrap {
 	enabled := a.engine != nil && a.engine.IsEnabled()
 	return Bootstrap{
-		KeyChoices: KeyLabels(),
-		Config:     a.config.ToMap(),
-		Status:     a.statusText(enabled),
-		Enabled:    enabled,
-		Processes:  ListWindowProcesses(),
+		KeyChoices:  KeyLabels(),
+		Config:      a.config.ToMap(),
+		Status:      a.statusText(enabled),
+		Enabled:     enabled,
+		Processes:   ListWindowProcesses(),
+		InputStatus: GetInputStatus(),
 	}
+}
+
+func (a *App) GetInputStatus() InputStatus {
+	return GetInputStatus()
 }
 
 func (a *App) ListProcesses() []ProcessInfo {
@@ -200,7 +258,7 @@ func (a *App) SaveConfig(cfg UIConfig) ActionResult {
 	return ActionResult{OK: true, Message: "状态：配置已保存", Enabled: enabled}
 }
 
-// Start 开启连发；有进程绑定时委托 ProcessFocusWatcher 判断前台。
+// Start 打开总开关；有进程绑定时仅在目标前台时真正连发。
 func (a *App) Start() ActionResult {
 	if len(a.config.KeyLabels) == 0 {
 		return ActionResult{OK: false, Message: "状态：请至少选择一个连发按键", Enabled: false}
@@ -208,47 +266,42 @@ func (a *App) Start() ActionResult {
 	if a.hotkeys != nil {
 		a.hotkeys.SetListening(false)
 	}
-	a.engine.ClearAutoPause()
+	a.engine.SetArmed(true)
+	a.syncBurstWithFocus()
 
-	if a.procWatch != nil && a.procWatch.Bound() != "" {
-		bound := a.procWatch.Bound()
-		if a.procWatch.IsTargetForeground() {
-			a.engine.SetEnabled(true)
-			return ActionResult{
-				OK:      true,
-				Message: "状态：连发中（" + bound + " 前台）",
-				Enabled: true,
-			}
-		}
-		a.engine.SetEnabled(false)
-		return ActionResult{
-			OK:      true,
-			Message: "状态：已恢复自动 — 请切到 " + bound + " 窗口",
-			Enabled: false,
-		}
+	enabled := a.engine.IsEnabled()
+	msg := a.statusText(enabled)
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "status", msg)
 	}
-
-	a.engine.SetEnabled(true)
-	return ActionResult{
-		OK:      true,
-		Message: "状态：已开启 — 按住已选键即可连发",
-		Enabled: true,
+	if a.tray != nil {
+		a.tray.UpdateEnabled(true)
 	}
+	return ActionResult{OK: true, Message: msg, Enabled: enabled}
 }
 
 func (a *App) Stop() ActionResult {
-	a.engine.SetAutoPaused(true)
-	a.engine.SetEnabled(false)
-	return ActionResult{OK: true, Message: "状态：已关闭", Enabled: false}
+	a.engine.SetArmed(false)
+	msg := "状态：已关闭"
+	if a.ctx != nil {
+		runtime.EventsEmit(a.ctx, "running", false)
+		runtime.EventsEmit(a.ctx, "status", msg)
+	}
+	if a.tray != nil {
+		a.tray.UpdateEnabled(false)
+	}
+	return ActionResult{OK: true, Message: msg, Enabled: false}
 }
 
 // applyConfig 把一份配置拆开交给各独立子系统，避免它们互相读取对方状态。
 func (a *App) applyConfig(cfg AppConfig) {
+	SetSuppressPhysical(cfg.SuppressPhysical)
 	if a.engine != nil {
 		a.engine.Configure(RepeatSettings{
 			KeyVKs:     LabelsToVKs(cfg.KeyLabels),
 			IntervalMs: cfg.IntervalMs,
 		})
+		a.engine.SyncSuppressMode()
 	}
 	if a.hotkeys != nil {
 		a.hotkeys.Configure(HotkeyBindings{
@@ -262,14 +315,21 @@ func (a *App) applyConfig(cfg AppConfig) {
 }
 
 func (a *App) statusText(enabled bool) string {
+	armed := a.engine != nil && a.engine.IsArmed()
 	if enabled {
 		if a.config.BoundProcess != "" {
 			return "状态：连发中（" + a.config.BoundProcess + " 前台）"
 		}
 		return "状态：已开启 — 按住已选键即可连发"
 	}
+	if armed && a.config.BoundProcess != "" {
+		return "状态：已开启自动 — 请切到 " + a.config.BoundProcess + " 窗口（热键可关闭）"
+	}
+	if armed {
+		return "状态：已开启 — 按住已选键即可连发"
+	}
 	if a.config.BoundProcess != "" {
-		return "状态：已绑定 " + a.config.BoundProcess + " — 切到该窗口自动连发"
+		return "状态：已关闭 — 按热键或「开启」后，" + a.config.BoundProcess + " 前台才连发"
 	}
 	return "状态：未开启 — 点「开启」或按 " + FormatHotkeyDisplay(a.config.EnableHotkey)
 }

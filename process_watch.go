@@ -5,23 +5,22 @@ import (
 	"time"
 )
 
-// FocusBurstControl 进程焦点监视器对连发引擎的最小依赖面。
+// FocusBurstControl 进程焦点监视器对连发的依赖。
+// armed = 热键/按钮总开关；enabled = 当前是否真正在连发。
 type FocusBurstControl interface {
 	IsInjecting() bool
 	IsEnabled() bool
-	IsAutoPaused() bool
-	ClearAutoPause()
+	IsArmed() bool
 	SetEnabled(on bool)
 }
 
-// ProcessFocusWatcher 在绑定进程位于前台时自动开启连发，切走或进程退出时关闭。
-//
-// 按进程映像名匹配（如 game.exe），不绑定 PID。通过 FocusBurstControl 操作引擎。
+// ProcessFocusWatcher：仅在「总开关 armed」打开时，按前台进程自动启停连发。
+// 热键关闭（disarm）后绝不会自动再开。
 type ProcessFocusWatcher struct {
 	burst FocusBurstControl
 
 	mu      sync.Mutex
-	bound   string // 小写进程名；空表示未绑定（本监视器空转）
+	bound   string
 	stopCh  chan struct{}
 	running bool
 	lastFG  string
@@ -55,18 +54,10 @@ func (p *ProcessFocusWatcher) Stop() {
 func (p *ProcessFocusWatcher) SetBound(name string) {
 	name = normalizeProcessName(name)
 	p.mu.Lock()
-	prev := p.bound
 	p.bound = name
 	p.lastFG = ""
 	p.mu.Unlock()
-	if name == "" && prev != "" {
-		p.burst.ClearAutoPause()
-		return
-	}
-	if name != "" {
-		p.burst.ClearAutoPause()
-		p.syncNow()
-	}
+	p.syncNow()
 }
 
 func (p *ProcessFocusWatcher) Bound() string {
@@ -75,7 +66,6 @@ func (p *ProcessFocusWatcher) Bound() string {
 	return p.bound
 }
 
-// IsTargetForeground 绑定进程是否正在运行且位于前台。
 func (p *ProcessFocusWatcher) IsTargetForeground() bool {
 	p.mu.Lock()
 	name := p.bound
@@ -114,35 +104,22 @@ func (p *ProcessFocusWatcher) tick() {
 		return
 	}
 
-	if !IsProcessNameRunning(name) {
-		p.mu.Lock()
-		p.lastFG = ""
-		p.mu.Unlock()
-		p.burst.ClearAutoPause()
+	// 总开关关闭：强制停连发，不改 armed
+	if !p.burst.IsArmed() {
 		if p.burst.IsEnabled() {
 			p.burst.SetEnabled(false)
 		}
 		return
 	}
 
+	running := IsProcessNameRunning(name)
 	fg := ForegroundProcessName()
 	p.mu.Lock()
 	p.lastFG = fg
 	p.mu.Unlock()
 
-	match := fg != "" && fg == name
-	if !match {
-		p.burst.ClearAutoPause()
-		if p.burst.IsEnabled() {
-			p.burst.SetEnabled(false)
-		}
-		return
-	}
-
-	if p.burst.IsAutoPaused() {
-		return
-	}
-	if !p.burst.IsEnabled() {
-		p.burst.SetEnabled(true)
+	want := running && fg != "" && fg == name
+	if want != p.burst.IsEnabled() {
+		p.burst.SetEnabled(want)
 	}
 }
