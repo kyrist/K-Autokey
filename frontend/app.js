@@ -527,13 +527,13 @@ function syncProcessInfo() {
   const el = $("process-info");
   if (!el) return;
   if (state.boundProcess) {
-    const text = `进程：${state.boundProcess}（前台自动连发）`;
+    const text = `进程：${state.boundProcess}`;
     el.textContent = text;
     el.title = text;
     el.classList.add("is-bound");
   } else {
     el.textContent = "进程：未绑定";
-    el.title = "未绑定进程时，请用按钮或热键手动开启连发";
+    el.title = "";
     el.classList.remove("is-bound");
   }
 }
@@ -608,30 +608,6 @@ function closeProcessModal() {
   $("process-modal").hidden = true;
 }
 
-function applyInputStatus(status) {
-  const hint = $("input-backend-hint");
-  if (!hint) return;
-  if (!status) {
-    hint.textContent = "";
-    hint.classList.remove("ok", "warn");
-    return;
-  }
-  hint.textContent = status.message || "";
-  hint.title = status.message || "";
-  hint.classList.toggle("ok", !!status.active);
-  hint.classList.remove("warn");
-
-  const suppressEl = $("suppress-physical");
-  const wrap = $("suppress-physical-wrap");
-  if (suppressEl) {
-    suppressEl.disabled = false;
-  }
-  if (wrap) {
-    wrap.title = "勾选=AHK $ 吞掉物理键避免叠加；不勾选=AHK ~ 透传";
-    wrap.classList.remove("is-disabled");
-  }
-}
-
 function applyBootstrap(data) {
   const cfg = data.config || {};
   state.keyChoices = data.key_choices || [];
@@ -646,7 +622,6 @@ function applyBootstrap(data) {
   $("interval-input").value = String(state.intervalMs);
   const suppressEl = $("suppress-physical");
   if (suppressEl) suppressEl.checked = state.suppressPhysical;
-  applyInputStatus(data.input_status);
   state.processes = data.processes || [];
   syncProcessInfo();
   syncHotkeyButtons();
@@ -737,10 +712,6 @@ function bindEvents() {
     suppressEl.addEventListener("change", async (e) => {
       state.suppressPhysical = !!e.target.checked;
       await pushConfig();
-      try {
-        const api = await waitApi();
-        if (api.GetInputStatus) applyInputStatus(await api.GetInputStatus());
-      } catch (_) {}
     });
   }
 

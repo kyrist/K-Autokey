@@ -55,12 +55,6 @@ body {
   font-weight: 700;
 }
 
-.tagline {
-  margin: 2px 0 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
 .status {
   padding: 7px 12px;
   border-radius: 999px;
@@ -420,16 +414,24 @@ input[type="number"] {
 
 .bottom-bar {
   flex-shrink: 0;
-  display: grid;
-  grid-template-columns: 88px minmax(168px, 210px) 148px 148px auto;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: end;
-  justify-content: start;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 10px 12px;
   box-shadow: var(--shadow);
+}
+
+.bottom-row {
+  display: flex;
+  gap: 10px;
+  align-items: end;
+}
+
+.bottom-settings {
+  flex-wrap: wrap;
 }
 
 .field {
@@ -443,46 +445,23 @@ input[type="number"] {
   min-width: 88px;
 }
 
-.field-backend {
-  min-width: 0;
-}
-
-.field-backend select {
-  width: 100%;
-}
-
-.backend-hint {
-  font-size: 0.68rem;
-  line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.backend-hint.ok {
-  color: var(--accent);
-}
-
-.backend-hint.warn {
-  color: #a15c18;
+.field-check {
+  width: 88px;
+  min-width: 88px;
 }
 
 .check-inline {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.72rem;
-  color: var(--muted);
+  font-size: 0.78rem;
+  color: var(--text);
   white-space: nowrap;
+  height: 36px;
 }
 
 .check-inline input {
   margin: 0;
-}
-
-.check-inline.is-disabled {
-  opacity: 0.55;
-  pointer-events: none;
 }
 
 .field-hotkey {
@@ -570,7 +549,7 @@ select {
   display: flex;
   gap: 6px;
   align-items: center;
-  margin-left: 4px;
+  justify-content: flex-end;
   padding-bottom: 0;
 }
 

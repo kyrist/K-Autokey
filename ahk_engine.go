@@ -56,8 +56,9 @@ func ahkPrepare() error {
 }
 
 // ahkStart 生成并启动连发脚本。
-// keys: 连发键的 AHK 键名列表（如 ["a","s","d"]）；intervalMs: 全局连发间隔。
-func ahkStart(keys []string, intervalMs int) error {
+// keys: 连发键的 AHK 键名列表（如 ["a","s","d"]）；intervalMs: 全局连发间隔；
+// suppress: 是否吞掉物理键（AHK $ 热键）。
+func ahkStart(keys []string, intervalMs int, suppress bool) error {
 	ahkMu.Lock()
 	defer ahkMu.Unlock()
 	if ahkRunning.Load() {
@@ -66,7 +67,7 @@ func ahkStart(keys []string, intervalMs int) error {
 	if err := ahkPrepare(); err != nil {
 		return err
 	}
-	script := ahkRenderScript(keys, intervalMs)
+	script := ahkRenderScript(keys, intervalMs, suppress)
 	if err := os.WriteFile(ahkScriptPath, []byte(script), 0o644); err != nil {
 		return err
 	}
@@ -118,7 +119,7 @@ func ahkStop() {
 func ahkRunning_() bool { return ahkRunning.Load() }
 
 // ahkRenderScript 生成 AHK v2 连发脚本，逻辑对齐 DNFAutoFire。
-func ahkRenderScript(keys []string, intervalMs int) string {
+func ahkRenderScript(keys []string, intervalMs int, suppress bool) string {
 	if intervalMs < 1 {
 		intervalMs = 1
 	}
@@ -126,6 +127,11 @@ func ahkRenderScript(keys []string, intervalMs int) string {
 	b.WriteString(ahkBurstScript)
 	b.WriteString("\n\n")
 	b.WriteString(fmt.Sprintf("global g_interval := %d\n", intervalMs))
+	if suppress {
+		b.WriteString("global g_suppress := true\n")
+	} else {
+		b.WriteString("global g_suppress := false\n")
+	}
 	b.WriteString("global g_keys := [")
 	for i, k := range keys {
 		if i > 0 {

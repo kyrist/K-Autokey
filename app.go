@@ -59,6 +59,11 @@ func (a *App) startup(ctx context.Context) {
 	a.tray.Start()
 	a.tray.UpdateEnabled(a.engine.IsEnabled())
 	debugLog("startup done")
+
+	// 启动后默认开启连发（armed=true）；若绑定了进程，仅在该进程前台时真正连发。
+	if len(a.config.KeyLabels) > 0 {
+		_ = a.Start()
+	}
 }
 
 func (a *App) onBurstStateChanged(enabled bool) {
@@ -173,7 +178,6 @@ type Bootstrap struct {
 	Status      string                 `json:"status"`
 	Enabled     bool                   `json:"enabled"`
 	Processes   []ProcessInfo          `json:"processes"`
-	InputStatus InputStatus            `json:"input_status"`
 }
 
 // ActionResult 供前端判断操作结果。
@@ -196,17 +200,12 @@ type UIConfig struct {
 func (a *App) GetBootstrap() Bootstrap {
 	enabled := a.engine != nil && a.engine.IsEnabled()
 	return Bootstrap{
-		KeyChoices:  KeyLabels(),
-		Config:      a.config.ToMap(),
-		Status:      a.statusText(enabled),
-		Enabled:     enabled,
-		Processes:   ListWindowProcesses(),
-		InputStatus: GetInputStatus(),
+		KeyChoices: KeyLabels(),
+		Config:     a.config.ToMap(),
+		Status:     a.statusText(enabled),
+		Enabled:    enabled,
+		Processes:  ListWindowProcesses(),
 	}
-}
-
-func (a *App) GetInputStatus() InputStatus {
-	return GetInputStatus()
 }
 
 func (a *App) ListProcesses() []ProcessInfo {
@@ -292,6 +291,7 @@ func (a *App) applyConfig(cfg AppConfig) {
 		a.engine.Configure(RepeatSettings{
 			KeyVKs:     LabelsToVKs(cfg.KeyLabels),
 			IntervalMs: cfg.IntervalMs,
+			Suppress:   cfg.SuppressPhysical,
 		})
 	}
 	if a.hotkeys != nil {

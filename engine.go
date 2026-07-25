@@ -20,6 +20,7 @@ import (
 type RepeatSettings struct {
 	KeyVKs     []uint16
 	IntervalMs int
+	Suppress   bool // true=吞掉物理键（AHK $ 热键），只让注入脉冲通过
 }
 
 type Engine struct {
@@ -66,12 +67,13 @@ func (e *Engine) Configure(s RepeatSettings) {
 	enabled := e.enabled
 	keys := append([]uint16(nil), s.KeyVKs...)
 	interval := int(e.intervalMs.Load())
+	suppress := s.Suppress
 	e.mu.Unlock()
 
-	// 已开启时改配置：重启 AHK 子进程以应用新键位 / 间隔。
+	// 已开启时改配置：重启 AHK 子进程以应用新键位 / 间隔 / 吞键。
 	if enabled {
 		names := labelsToAHKKeyNames(keys)
-		if err := ahkStart(names, interval); err != nil {
+		if err := ahkStart(names, interval, suppress); err != nil {
 			debugLog("Engine.Configure ahkStart error: %v", err)
 		}
 	}
@@ -139,12 +141,13 @@ func (e *Engine) SetEnabled(on bool) {
 	e.enabledFlag.Store(on)
 	keys := append([]uint16(nil), e.settings.KeyVKs...)
 	interval := int(e.intervalMs.Load())
+	suppress := e.settings.Suppress
 	e.mu.Unlock()
-	debugLog("Engine.SetEnabled(%v) keys=%v interval=%d", on, keys, interval)
+	debugLog("Engine.SetEnabled(%v) keys=%v interval=%d suppress=%v", on, keys, interval, suppress)
 
 	if on {
 		names := labelsToAHKKeyNames(keys)
-		if err := ahkStart(names, interval); err != nil {
+		if err := ahkStart(names, interval, suppress); err != nil {
 			debugLog("ahkStart error: %v", err)
 		} else {
 			debugLog("ahkStart ok keys=%v", names)
