@@ -54,7 +54,8 @@ AutoFireSingleKeyTick(pressKey, keyCode) {
 }
 
 ; 发送一次 down/up（对齐 DNFAutoFire 的 SendIP）
-SendIP(keyCode, keyDelayMs := 8) {
+; keyDelayMs=4：按下保持 4ms；发送后 Sleep 1ms 间隔
+SendIP(keyCode, keyDelayMs := 4) {
     keyDelayMs := Round(keyDelayMs + 0)
     if (keyDelayMs < 0) {
         keyDelayMs := 0
@@ -65,7 +66,7 @@ SendIP(keyCode, keyDelayMs := 8) {
         SendEvent("{Blind}{" keyCode " DownTemp}")
         DllCall("Sleep", "UInt", keyDelayMs)
         SendEvent("{Blind}{" keyCode " Up}")
-        DllCall("Sleep", "UInt", 2)
+        DllCall("Sleep", "UInt", 1)
     } finally {
         Critical("Off")
     }
