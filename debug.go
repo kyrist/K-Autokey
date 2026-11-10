@@ -8,16 +8,20 @@ import (
 	"time"
 )
 
-// debug.go：运行时诊断日志，写入 %APPDATA%\K-Autokey\debug.log。
-// 用于定位连发/热键不生效等运行时问题。
+// debug.go：可选运行时诊断日志。
+// 默认关闭；仅当环境变量 K_AUTOKEY_DEBUG=1 时写入 %APPDATA%\K-Autokey\debug.log。
 
 var (
-	debugMu  sync.Mutex
-	debugOn  = true
+	debugMu   sync.Mutex
+	debugOn   bool
 	debugFile string
 )
 
 func debugLogInit() {
+	if os.Getenv("K_AUTOKEY_DEBUG") != "1" {
+		debugOn = false
+		return
+	}
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return
@@ -25,7 +29,8 @@ func debugLogInit() {
 	dir = filepath.Join(dir, "K-Autokey")
 	_ = os.MkdirAll(dir, 0o755)
 	debugFile = filepath.Join(dir, "debug.log")
-	_ = os.WriteFile(debugFile, []byte(""), 0o644) // 每次启动清空
+	_ = os.WriteFile(debugFile, []byte(""), 0o644) // 开启调试时每次启动清空
+	debugOn = true
 }
 
 func debugLog(format string, args ...interface{}) {

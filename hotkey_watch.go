@@ -137,21 +137,16 @@ func (h *HotkeyWatcher) tick() {
 	en := enOK && enHK.IsDown()
 	emg := emgOK && emgHK.IsDown()
 
-	debugLog("hotkey tick: enable=%s ok=%v down=%v | emergency=%s ok=%v down=%v | prevEn=%v prevEmg=%v",
-		b.Enable, enOK, en, b.Emergency, emgOK, emg, h.prevEn, h.prevEmg)
-
 	h.mu.Lock()
 	prevEn, prevEmg := h.prevEn, h.prevEmg
 	h.prevEn, h.prevEmg = en, emg
 	h.mu.Unlock()
 
 	if emg && !prevEmg {
-		debugLog("hotkey: emergency triggered")
 		h.burst.EmergencyStop()
 		return
 	}
 	if en && !prevEn {
-		debugLog("hotkey: enable toggled")
 		h.burst.ToggleEnabled()
 	}
 }
